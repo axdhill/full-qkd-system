@@ -337,17 +337,20 @@ def LDPC_binary_decode(bob_thread, alice_thread, decoder='log-bp-fft', iteration
   and 1 - diagonal/anti-diagonal basis
 '''
 def prepare_bases(channels, channelArray):
-    
+    print "-----Preparing Polarization Data------"
+    print channelArray
     bases = zeros(len(channels), dtype=uint8)
     pol_value = zeros(len(channels), dtype=uint8)
-    one_diagonal_basis = channelArray[2:]
+    one_diagonal_basis = [2,3,6,7]
 
-    pol_bin_vals = array([channelArray[1],channelArray[3]]) # Converts pol to binary value in both bases
-
+    pol_bin_vals = [1,3,5,7] # Converts pol to binary value in both bases
+    print channels
     
     bases[in1d(channels, one_diagonal_basis)] = 1
     pol_value[in1d(channels,pol_bin_vals)] = 1
-    
+    print bases
+    print pol_value
+    print "-----End Prep------"
     return bases,pol_value
 
 '''
@@ -405,18 +408,18 @@ class PartyThread(threading.Thread):
             
             print self.name.upper() + ": Loading delays\n"
             self.delays = load("./Delays/delays.npy")
-            print self.delays
+
 
 
             print self.name.upper() + ": Applying Delays"
 
             self.ttags = self.ttags.astype(int64)
 
-            for delay, ch1 in zip(self.delays, self.channelArray):
-                if delay < 0 and self.name == "bob":
-                    self.ttags[self.channels == ch1] += (abs(delay)).astype(uint64)
-                elif delay >= 0 and self.name == "alice":
-                    self.ttags[self.channels == ch1] += delay.astype(uint64)
+            self.allchannels = [0,1,2,3,4,5,6,7]
+            #print transpose(vstack((self.delays, self.allchannels)))
+
+            for delay, ch1 in transpose(vstack((self.delays.astype(int64), self.allchannels))):
+                    self.ttags[self.channels == ch1] += delay
 
 
             # Sorting all data with delays
@@ -459,31 +462,31 @@ if __name__ == '__main__':
     start = time.time()
 # ============ PARAMETERS ===========================================
 
-    raw_file_dir = "./DarpaQKD/Alice1_Bob1.csv"
+    raw_file_dir = "/storage/DARPAQKD/Alice1_Bob1.csv"
     alice_channels = [0, 1, 2, 3]
     bob_channels = [4, 5, 6, 7]
     
 #   Uncomment if raw text file has to be processed first
 #
-#    load_save_raw_file(raw_file_dir, alice_channels, bob_channels)
+ #   load_save_raw_file(raw_file_dir, alice_channels, bob_channels)
     print "OK"
     
     set_printoptions(edgeitems=20)
     resolution = 260e-12
     
 #   perfect window for bright data is 3905e-12  
-    coincidence_window_radius = 200 - 12
+    coincidence_window_radius = 200e-12
     
     delay_max = 1e-5
 #     sync_period = 63 * 260e-12
     announce_fraction = 1.0
     announce_binary_fraction = 1.0
 #     D_block_size = int(coincidence_window_radius / resolution) * 2 + 1
-    data_factor = 10000
-    optimal_frame_size = 16
+    data_factor = 20000
+    optimal_frame_size =256
     column_weight = 5
     row_weight = 32
-    fraction_parity_checks = 0.6
+    fraction_parity_checks = 0.2
     
 #     padding_zeros = 0
 #     while D_block_size != 0:
@@ -524,14 +527,14 @@ if __name__ == '__main__':
 
     print "MAIN: STATISTICS: "
     (alice, bob, alice_chan, bob_chan) = (alice_thread.ttags, bob_thread.ttags, alice_thread.channels, bob_thread.channels)
-# ===================== OPTIMAL FRAME SIZE EXTRACTION ===================================================================
-#     
-#     statistics = calculateStatistics(alice,bob,alice_chan,bob_chan, resolution)
-#     print statistics
-#     max_shared_binary_entropy = max(statistics.values())
-#     optimal_frame_size = int(list(statistics.keys())[list(statistics.values()).index(max_shared_binary_entropy)])
-#     print "MAIN: The maximum entropy was found to be ",max_shared_binary_entropy," with frame size: ",optimal_frame_size
-# =======================================================================================================================
+#===================== OPTIMAL FRAME SIZE EXTRACTION ===================================================================
+    #
+    # statistics = calculateStatistics(alice,bob,alice_chan,bob_chan, resolution)
+    # print statistics
+    # max_shared_binary_entropy = max(statistics.values())
+    # optimal_frame_size = int(list(statistics.keys())[list(statistics.values()).index(max_shared_binary_entropy)])
+    # print "MAIN: The maximum entropy was found to be ",max_shared_binary_entropy," with frame size: ",optimal_frame_size
+#=======================================================================================================================
     alice_thread.frame_size = optimal_frame_size
     bob_thread.frame_size = optimal_frame_size
 
@@ -662,8 +665,6 @@ if __name__ == '__main__':
     print "Bob Pol:   ", bob_thread.pol_string
 
 
-
-
     # print "Bases strings"
     # print alice_non_zero_positions_in_frame_channels
     # print bob_non_zero_positions_in_frame_channels
@@ -680,18 +681,28 @@ if __name__ == '__main__':
     bob_thread.non_zero_positions = bob_non_zero_positions_in_frame[mutual_bases]
     bob_thread.non_zero_positions_channels = bob_non_zero_positions_in_frame_channels[mutual_bases]
 
-
+    alice_thread.pol_string = alice_thread.pol_string[mutual_bases[0]]
+    bob_thread.pol_string = bob_thread.pol_string[mutual_bases[0]]
 
     correct_pols = where(alice_thread.pol_string == bob_thread.pol_string)
+
+    print "----------AFTER SIFTING----------"
+    print "Alice Basis: ", alice_thread.bases_string[mutual_bases]
+    print "Bob Basis:   ", bob_thread.bases_string[mutual_bases]
+
+    print "Alice Pol: ", alice_thread.pol_string
+    print "Bob Pol:   ", bob_thread.pol_string
+
+
+
 
     #   Estimates QBER where it is determined from non-mathcing pols  TODO: should be determined only from announced fraction
     QBER = 1 - len(correct_pols[0]) / float(len(bob_thread.pol_string))
     print "ERROR IN POLARIZATION (QBER)", QBER
-    
-    if QBER * 100 > 21:
-        warn("The QBER is greater than 21%!!!!!")
-
     sys.exit()
+
+
+
 
 
 
@@ -708,8 +719,8 @@ if __name__ == '__main__':
     alice_thread.received_string = bob_thread.non_zero_positions[:int(len(bob_thread.non_zero_positions) * announce_fraction)]
     bob_thread.received_string = alice_thread.non_zero_positions[:int(len(alice_thread.non_zero_positions) * announce_fraction)]
 
-    alice_thread.received_binary_string = bob_thread.bases_string[:int(len(bob_thread.bases_string) * announce_binary_fraction)]
-    bob_thread.received_binary_string = alice_thread.bases_string[:int(len(alice_thread.bases_string) * announce_binary_fraction)]
+    alice_thread.received_binary_string = bob_thread.pol_string[:int(len(bob_thread.pol_string) * announce_binary_fraction)]
+    bob_thread.received_binary_string = alice_thread.pol_string[:int(len(alice_thread.pol_string) * announce_binary_fraction)]
     print len(alice_thread.non_zero_positions), len(bob_thread.non_zero_positions)
     print "MAIN: The error in the timing key before correcting", sum(bob_thread.non_zero_positions != alice_thread.non_zero_positions) / len(alice_thread.non_zero_positions)
     print "MAIN: SUCCESFULLY ANNOUNCED WILL RELEASE THREADS\n"
@@ -736,7 +747,7 @@ if __name__ == '__main__':
     bob_thread.bases_string = LDPC_binary_decode(bob_thread, alice_thread)
     print "MAIN: NON-BINARY DECODING\n"
 
-    bob_thread.non_zero_positions = LDPC_decode_all_chunks(alice_thread, bob_thread, fraction_parity_checks=0.6, chunk_size=40, iterations=10, column_weight=3)
+    bob_thread.non_zero_positions = LDPC_decode_all_chunks(alice_thread, bob_thread, fraction_parity_checks=0.2, chunk_size=40000, iterations=40, column_weight=5)
 
     print "MAIN: Key length", len(alice_thread.non_zero_positions), "and number of bits", (optimal_frame_size - 1).bit_length()
     print "MAIN: NON-SECRET-KEY-RATE: MBit/s", ((((optimal_frame_size - 1).bit_length() * len(alice_thread.non_zero_positions)) + (len(alice_thread.bases_string))) / (alice_thread.ttags[-1] * 260e-12)) / 1e6
@@ -772,5 +783,5 @@ if __name__ == '__main__':
     savetxt("./Secret_keys/bob_secret_key1.txt", bob_key, fmt="%2d")
     
     end = time.time()
-    print "MAIN: DUARTION", (end - start)
+    print "MAIN: DURATION", (end - start)
     

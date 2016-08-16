@@ -426,7 +426,7 @@ def calculateStatistics(alice,bob,alice_pol,bob_pol,resolution):
 #     bob_binary_string_laser = create_binary_string_from_laser_pulses(bob,coincidence_window_radius,resolution)
     binary_entropies = {}
 #================FOR LOOP STARTS (recommended to go 1-13======================================================================================================================
-    for frame_size in 2**array(range(1,13)):
+    for frame_size in 2**array(range(1,16)):
         print "\n"
         print("DOING ALPHABET",frame_size)
 #======================PROCESSING DATA=========================================================

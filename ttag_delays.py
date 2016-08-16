@@ -29,12 +29,12 @@ def getDelay(buf,channel1,channel2,initialdelay1=0.0,initialdelay2=0.0,delaymax 
     mu = argmax(corr)
     sigma = 5
     A = max(corr)
-#     
-#     try:
-#         popt,pcov = curve_fit(gauss,range(bins),corr,p0=(A,mu,sigma))
-#         print(channel1,channel2,"FIT: (A,mu,sigma)=",popt)
-#         return (popt[1]-len(corr)/2)*buf.resolution
-#     except:
+
+    # try:
+    #     popt,pcov = curve_fit(gauss,range(bins),corr,p0=(A,mu,sigma))
+    #     print(channel1,channel2,"FIT: (A,mu,sigma)=",popt)
+    #     return (popt[1]-len(corr)/2)*buf.resolution
+    # except:
     return (mu-len(corr)/2)*buf.resolution
 
 
@@ -53,7 +53,6 @@ def getPossibleInitialDelays(buf,syncChannel1,syncChannel2):
     return delays
 
 def getDelays(buf,channels1,channels2,initialdelay2=0.0,delays1=None,delays2=None,delaymax=0.0000001,time=1.0):
-
     if (delays1==None):
         delays1=zeros(len(channels1))
     if (delays2==None):
@@ -68,7 +67,7 @@ def getDelays(buf,channels1,channels2,initialdelay2=0.0,delays1=None,delays2=Non
         delays1[i] -= getDelay(buf,channels1[i],channels2[0],delays1[i],delays2[0])
 
     return (delays1,delays2)
-"""
+
 def plotAll(buf,channels1,channels2,delays1,delays2):
     bins = 100
     length = bins/2*buf.resolution
@@ -88,7 +87,7 @@ def plotAll(buf,channels1,channels2,delays1,delays2):
     ax[0].set_title("Correlations Between Alice and Bob's Channels")
     f.subplots_adjust(hspace=0)
     ax[0].legend()
-"""
+
 # buf = ttag.TTBuffer(0)
 # d = getPossibleInitialDelays(buf,0,6)
 # 
