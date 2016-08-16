@@ -145,16 +145,16 @@ def load_data(name, channelArray, data_factor):
 #     laser_pulse = 260e-12
     sys.stdout.flush()
 #     all_ttags = load("./DarpaQKD/"+name+"Ttags.npy")
-#     all_ttags = load("./DarpaQKD/"+name+"TtagsREBINNED.npy")
-    all_ttags = load("./DarpaQKD/" + name + "TtagsREBINNEDfull.npy")
+    all_ttags = load("./DarpaQKD/"+name+"TtagsREBINNED.npy")
+#    all_ttags = load("./DarpaQKD/" + name + "TtagsREBINNEDfull.npy")
 #     all_ttags = load("./DarpaQKD/"+name+"TtagsBrightAttempt1.npy")
 #     all_ttags = load("./DarpaQKD/"+name+"TtagsBrightAttempt2.npy")
 #     all_ttags = load("./DarpaQKD/"+name+"TtagsBrightAttempt3.npy")
 
 #     all_channels = load("./DarpaQKD/"+name+"Channels.npy")
 
-#     all_channels = load("./DarpaQKD/"+name+"ChannelsREBINNED.npy")
-    all_channels = load("./DarpaQKD/" + name + "ChannelsREBINNEDfull.npy")
+    all_channels = load("./DarpaQKD/"+name+"ChannelsREBINNED.npy")
+#    all_channels = load("./DarpaQKD/" + name + "ChannelsREBINNEDfull.npy")
 
 #     all_channels = load("./DarpaQKD/"+name+"ChannelsBrightAttempt1.npy")
 #     all_channels = load("./DarpaQKD/"+name+"ChannelsBrightAttempt2.npy")
@@ -339,11 +339,16 @@ def LDPC_binary_decode(bob_thread, alice_thread, decoder='log-bp-fft', iteration
 def prepare_bases(channels, channelArray):
     
     bases = zeros(len(channels), dtype=uint8)
+    pol_value = zeros(len(channels), dtype=uint8)
     one_diagonal_basis = channelArray[2:]
+
+    pol_bin_vals = array([channelArray[1],channelArray[3]]) # Converts pol to binary value in both bases
+
     
     bases[in1d(channels, one_diagonal_basis)] = 1
+    pol_value[in1d(channels,pol_bin_vals)] = 1
     
-    return bases    
+    return bases,pol_value
 
 '''
   Main thread class for Alex and Bob which are instances of it.
@@ -399,7 +404,7 @@ class PartyThread(threading.Thread):
             print "TOTAL TIME: ", self.ttags[-1] * 260e-12, " in seconds"
             
             print self.name.upper() + ": Loading delays\n"
-            self.delays = load("./resultsLaurynas/Delays/delays.npy")
+            self.delays = load("./Delays/delays.npy")
             print self.delays
 
 
@@ -442,7 +447,7 @@ class PartyThread(threading.Thread):
 
 #             self.frame_locations = calculate_frame_locations_daniels_mapping(self.ttags, self.frame_occupancies, self.frame_size)
             (self.frame_locations, self.frame_location_channels) = calculate_frame_locations_for_single_occ(self.ttags, self.channels, self.frame_occupancies, self.frame_size)
-            
+
             print self.name.upper() + ": FINISHED Calculating frame occupancies and locations. WILL RELEASE MAIN\n"
             self.do_clear()
 
@@ -459,8 +464,9 @@ if __name__ == '__main__':
     bob_channels = [4, 5, 6, 7]
     
 #   Uncomment if raw text file has to be processed first
-#     load_save_raw_file(raw_file_dir, alice_channels, bob_channels)
-    
+#
+#    load_save_raw_file(raw_file_dir, alice_channels, bob_channels)
+    print "OK"
     
     set_printoptions(edgeitems=20)
     resolution = 260e-12
@@ -473,7 +479,7 @@ if __name__ == '__main__':
     announce_fraction = 1.0
     announce_binary_fraction = 1.0
 #     D_block_size = int(coincidence_window_radius / resolution) * 2 + 1
-    data_factor = 1000
+    data_factor = 10000
     optimal_frame_size = 16
     column_weight = 5
     row_weight = 32
@@ -646,32 +652,49 @@ if __name__ == '__main__':
     print "MAIN: Total number of frames ", len(alice_thread.frame_occupancies), " where mutual non zero frames ", len(alice_non_zero_positions_in_frame)
     
 #   Calculates binary string with bases values and find mutual bases with same values   
-    alice_thread.bases_string = prepare_bases(alice_non_zero_positions_in_frame_channels, alice_thread.channelArray)
-    bob_thread.bases_string = prepare_bases(bob_non_zero_positions_in_frame_channels, bob_thread.channelArray)
-    print "Bases strings"
-    print alice_non_zero_positions_in_frame_channels
-    print bob_non_zero_positions_in_frame_channels
-    print alice_thread.bases_string
-    print bob_thread.bases_string
+    alice_thread.bases_string,alice_thread.pol_string = prepare_bases(alice_non_zero_positions_in_frame_channels, alice_thread.channelArray)
+    bob_thread.bases_string,bob_thread.pol_string  = prepare_bases(bob_non_zero_positions_in_frame_channels, bob_thread.channelArray)
+
+    print "Alice Basis: ", alice_thread.bases_string
+    print "Bob Basis:   ", bob_thread.bases_string
+
+    print "Alice Pol: ", alice_thread.pol_string
+    print "Bob Pol:   ", bob_thread.pol_string
+
+
+
+
+    # print "Bases strings"
+    # print alice_non_zero_positions_in_frame_channels
+    # print bob_non_zero_positions_in_frame_channels
+    # print alice_thread.bases_string
+    # print bob_thread.bases_string
     
     mutual_bases = where(alice_thread.bases_string == bob_thread.bases_string)
-    
-#   Estimates QBER where it is determined from non-mathcing bases  TODO: should be determined only from announced fraction
-    QBER = 1 - len(mutual_bases[0]) / float(len(bob_thread.bases_string))
-    print "ERROR IN BASES (QBER)", QBER
+
+    print "MAIN: Now I will throw out all different-basis coincidences\n"
+
+    alice_thread.non_zero_positions = alice_non_zero_positions_in_frame[mutual_bases]
+    alice_thread.non_zero_positions_channels = alice_non_zero_positions_in_frame_channels[mutual_bases]
+
+    bob_thread.non_zero_positions = bob_non_zero_positions_in_frame[mutual_bases]
+    bob_thread.non_zero_positions_channels = bob_non_zero_positions_in_frame_channels[mutual_bases]
+
+
+
+    correct_pols = where(alice_thread.pol_string == bob_thread.pol_string)
+
+    #   Estimates QBER where it is determined from non-mathcing pols  TODO: should be determined only from announced fraction
+    QBER = 1 - len(correct_pols[0]) / float(len(bob_thread.pol_string))
+    print "ERROR IN POLARIZATION (QBER)", QBER
     
     if QBER * 100 > 21:
         warn("The QBER is greater than 21%!!!!!")
 
+    sys.exit()
 
-    print "MAIN: Now I will throw out all different-polarization coincidences\n"
 
-    alice_thread.non_zero_positions = alice_non_zero_positions_in_frame[mutual_bases]
-    alice_thread.non_zero_positions_channels = alice_non_zero_positions_in_frame_channels[mutual_bases]
-        
-    bob_thread.non_zero_positions = bob_non_zero_positions_in_frame[mutual_bases]
-    bob_thread.non_zero_positions_channels = bob_non_zero_positions_in_frame_channels[mutual_bases]
-    
+
 #   The LDPC matrices start from 0 so alphabet size must be reduced by one
     bob_thread.non_zero_positions -= 1
     alice_thread.non_zero_positions -= 1

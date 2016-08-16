@@ -6,7 +6,8 @@ Created on Jun 8, 2016
 from numpy import concatenate,take,uint64,save, int64,zeros,where,argwhere,intersect1d,load,array,append,savetxt,in1d
 import sys
 from System import load_data
-from numpy import uint8
+from numpy import uint8,ndarray
+from itertools import product
 import ttag
 from ttag_delays import getDelay, getDelays
 from Statistics import create_binary_string_from_laser_pulses as laser
@@ -24,20 +25,20 @@ def remake_coincidence_matrix(coincidence_matrix):
 
 
 def check_correlations(aliceTtags,aliceChannels,bobTtags,bobChannels,resolution, A_B_timetags, A_B_channels,channels1,channels2,delays,coincidence_window_radius):
-
-    for delay,ch1,ch2 in zip(delays,channels1,channels2):
-        if delay < 0:
-            A_B_timetags[A_B_channels == ch2] += (abs(delay)).astype(uint64)
-        else:
-            A_B_timetags[A_B_channels == ch1] += delay.astype(uint64)
-               
+    # channels = transpose([tile(channels1, len(channels2)), repeat(channels2, len(channels1))])
+    # for delay,ch1,ch2 in zip(delays,channels[:,0],channels[:,1]):
+    #     if delay < 0:
+    #         A_B_timetags[A_B_channels == ch2] += (abs(delay)).astype(uint64)
+    #     else:
+    #         A_B_timetags[A_B_channels == ch1] += delay.astype(uint64)
+    #
     indexes_of_order = A_B_timetags.argsort(kind = "mergesort")
     A_B_channels = take(A_B_channels,indexes_of_order)
-    A_B_timetags = take(A_B_timetags,indexes_of_order)      
+    A_B_timetags = take(A_B_timetags,indexes_of_order)+uint64(abs(min(delays)))
 
     buf_num = ttag.getfreebuffer() 
     buffer = ttag.TTBuffer(buf_num,create=True,datapoints = int(5e7))
-    buffer.resolution = 260e-12
+    buffer.resolution = 78.125e-12 # 260e-12
     buffer.channels = max(A_B_channels)+1
     buffer.addarray(A_B_channels,A_B_timetags)
 
@@ -49,15 +50,15 @@ def check_correlations(aliceTtags,aliceChannels,bobTtags,bobChannels,resolution,
     bufDelays.addarray(A_B_channels,A_B_timetags.astype(uint64))
      
     
-    
-    with_delays = (bufDelays.coincidences((A_B_timetags[-1]-1)*bufDelays.resolution, coincidence_window_radius))
+
+    with_delays = (bufDelays.coincidences((A_B_timetags[-1]-1)*bufDelays.resolution, coincidence_window_radius,delays*bufDelays.resolution))
     remade = remake_coincidence_matrix(with_delays)
     
     print "__COINCIDENCES WITH DELAYS ->>\n",remade.astype(uint64)
     
 def calculate_delays(aliceTtags,aliceChannels,bobTtags,bobChannels,
-                    resolution= 260e-12,
-                    coincidence_window_radius = 200-12,
+                    resolution= 78.125e-12,
+                    coincidence_window_radius = 200e-12,
                     delay_max = 1e-6):
     
     channels1 = [0,1,2,3]
@@ -80,23 +81,28 @@ def calculate_delays(aliceTtags,aliceChannels,bobTtags,bobChannels,
     remade = remake_coincidence_matrix(coincidences_before)
     print "__COINCIDENCES BEFORE-->>\n",remade.astype(uint64)
 
-    channel_number  = int(max(append(channels1,channels2)))
+    channel_number  = len(channels1)*len(channels2)
     delays = zeros(channel_number)
     k = 0
-    for i,j in zip(channels1, channels2):
-        delays[i] = (getDelay(bufN,i,j,delaymax=delay_max,time=(A_B_timetags[-1]-1)*bufN.resolution))/bufN.resolution
-        print delays[i]
+
+    for i,j in product(channels1,channels2):  #zip(channels1, channels2)
+        delays[k] = (getDelay(bufN,i,j,delaymax=delay_max,time=(A_B_timetags[-1]-1)*bufN.resolution))/bufN.resolution
+        #print delays[i]
+        #print i,j
         k+=1
+
+    delays = array([0,delays[2]+delays[6],delays[2]+delays[10],delays[3]+delays[15],delays[0],delays[2]+delays[6],delays[2],delays[3]])
+    print delays
     check_correlations(aliceTtags, aliceChannels, bobTtags, bobChannels, resolution, A_B_timetags, A_B_channels, channels1, channels2, delays, coincidence_window_radius)
     print("Saving delays to file.")
-    save("./resultsLaurynas/Delays/delays.npy",delays)
+    save("./Delays/delays.npy",delays)
     
 if (__name__ == '__main__'):
     alice_channels = [0,1,2,3]
     bob_channels =   [4,5,6,7]
     
-    (aliceTtags,aliceChannels) = load_data("alice",alice_channels,100)
-    (bobTtags,bobChannels) = load_data("bob",bob_channels,100)
+    (aliceTtags,aliceChannels) = load_data("alice",alice_channels,1)
+    (bobTtags,bobChannels) = load_data("bob",bob_channels,1)
     
     indexes_of_order = aliceTtags.argsort(kind = "mergesort")
     aliceChannels = take(aliceChannels,indexes_of_order)
@@ -112,5 +118,5 @@ if (__name__ == '__main__'):
     bobTtags = bobTtags[:len(bobTtags)]
     bobChannels = bobChannels[:len(bobChannels)]
     
-    calculate_delays(aliceTtags.astype(uint64), aliceChannels.astype(uint8), bobTtags.astype(uint64), bobChannels.astype(uint8),coincidence_window_radius = 200E-12) 
+    calculate_delays(aliceTtags.astype(uint64), aliceChannels.astype(uint8), bobTtags.astype(uint64), bobChannels.astype(uint8),coincidence_window_radius = 200e-12)
 

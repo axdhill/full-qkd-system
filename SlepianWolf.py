@@ -591,7 +591,8 @@ class swnb_node(sw_mathc):
 #             print self.syndromeValue
         # elif (len(self.connections)<2):
         #    print "Warning: Node has <2 connections!"
-        self.inputMatrix = ones((alphabet, len(self.connections)))
+        self.inputMatrix = ones((alphabet, len(self.connections)))/alphabet
+
     
     # Recieve recieves the conditional probability of the given node according to the object
     def receive(self, obj, prob):
@@ -606,7 +607,7 @@ class swnb_node(sw_mathc):
         # Find the resulting probability matrix
 #         print "IM HEEREEEE!!!!!!!!!!!!!!!!",type(self)
         mat = self.runAlgorithm()
-#         print "MAT:",mat
+#        print "MAT:",mat
 
         # Propagate the values to each of the associated matrix's connections
 #         print "@@@@@@@@@@@@@@@@@@@@@"
