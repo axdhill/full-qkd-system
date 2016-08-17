@@ -13,15 +13,7 @@ from ttag_delays import *
 from Statistics import create_binary_string_from_laser_pulses as laser
 
 def remake_coincidence_matrix(coincidence_matrix):
-    channels = len(coincidence_matrix[0][:])
-    width = channels/2
-    height = len(coincidence_matrix[:][0])/2
-    matrix = zeros((height,width))
-    
-    for i in range(height):
-        for j in range(width):
-            matrix[i][j] = coincidence_matrix[i][channels/2+j]
-    return matrix
+    return transpose(coincidence_matrix[4:,0:4])
 
 
 def check_correlations(aliceTtags,aliceChannels,bobTtags,bobChannels,resolution, A_B_timetags, A_B_channels,channels1,channels2,delays,coincidence_window_radius):
@@ -42,28 +34,30 @@ def check_correlations(aliceTtags,aliceChannels,bobTtags,bobChannels,resolution,
     buffer.channels = max(A_B_channels)+1
     buffer.addarray(A_B_channels,A_B_timetags)
 
-    
+
     buf_num = ttag.getfreebuffer()
     bufDelays = ttag.TTBuffer(buf_num,create=True,datapoints = int(5e7))
     bufDelays.resolution = resolution
     bufDelays.channels = max(A_B_channels)+1
     bufDelays.addarray(A_B_channels,A_B_timetags.astype(uint64))
-     
-    print delays
 
-    with_delays = (bufDelays.coincidences((A_B_timetags[-1]-1)*bufDelays.resolution, coincidence_window_radius,delays*resolution))
-    print with_delays
+
+    with_delays = (bufDelays.coincidences((A_B_timetags[-1]-2*max(abs(delays)))*bufDelays.resolution, coincidence_window_radius,delays*resolution))
+
+
     remade = remake_coincidence_matrix(with_delays)
     
     print "__COINCIDENCES WITH DELAYS ->>\n",remade.astype(uint64)
 
-
+    print "Estimated Pol QBER: "
+    print "H/V: ",(remade[1,0]+remade[0,1])/float(remade[0,0]+remade[0,1]+remade[1,0]+remade[1,1])
+    print "D/A: ",(remade[3,2]+remade[2,3])/float(remade[2,2]+remade[2,3]+remade[3,2]+remade[3,3])
 
     
 def calculate_delays(aliceTtags,aliceChannels,bobTtags,bobChannels,
                     resolution= 78.125e-12,
                     coincidence_window_radius = 200e-12,
-                    delay_max = 1e-6):
+                    delay_max = .1e-6):
     
     channels1 = [0,1,2,3]
     channels2 = [4,5,6,7]
@@ -88,21 +82,20 @@ def calculate_delays(aliceTtags,aliceChannels,bobTtags,bobChannels,
     print "__COINCIDENCES BEFORE-->>\n",remade.astype(uint64)
 
     channel_number  = len(channels1)*len(channels2)
-    # delays = zeros((8,8))
-    # k = 0
-    # for i,j in product(channels1,channels2):  #zip(channels1, channels2)
-    #     delays[i,j] = (getDelay(bufN,i,j,delaymax=delay_max,time=(A_B_timetags[-1]-1)*bufN.resolution))/bufN.resolution
-    #     #print delays[i]
-    #     #print i,j
-    #     k+=1
-    #
-    # delays = array([0, delays[0,6]+delays[1,6], delays[0,6]+delays[2,6], delays[0,7]+delays[3,7], delays[0,4],   delays[0,6]+delays[1,6]+delays[1,5],  delays[0,6],  delays[0,7]])
+    delays = zeros((8,8))
+    k = 0
+    for i,j in product(channels1,channels2):  #zip(channels1, channels2)
+        delays[i,j] = (getDelay(bufN,i,j,delaymax=delay_max,time=(A_B_timetags[-1]-1)*bufN.resolution))/bufN.resolution
+        #print delays[i]
+        #print i,j
+        k+=1
+
+    delays = array([0, delays[0,6]+delays[1,6], delays[0,6]-delays[2,6], delays[0,7]-delays[3,7], delays[0,4],   delays[0,6]+delays[1,6]+delays[1,5],  delays[0,6],  delays[0,7]])
+    print delays
+
+    # delays = getDelays(bufN,alice_channels,bob_channels,0.0,None,None,0.0000001,(A_B_timetags[-1]-10000)*bufN.resolution)
+    # delays = concatenate((delays[0]/resolution,delays[1]/resolution))
     # print delays
-
-    delays = getDelays(bufN,alice_channels,bob_channels,0.0,None,None,0.0000001,(A_B_timetags[-1]-1)*bufN.resolution)
-
-    delays = concatenate((delays[0]/resolution,delays[1]/resolution))
-
 
 
 
