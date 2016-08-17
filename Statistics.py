@@ -47,6 +47,7 @@ from SW_prep import *
 from SlepianWolf import *
 from entropy_calculator import *
 from itertools import *
+from scipy.misc import factorial
 
 
 #Assumes that the person's data is ordered
@@ -156,8 +157,9 @@ def calculate_frame_entropy(frame_locations, frame_size):
         entropy += probabilities[number_of_parity_check_eqns]*log2_modified(probabilities[number_of_parity_check_eqns])
     return entropy*(-1)
 
-def calculate_frame_occupancy(binary_string, frame_size):
-    
+def calculate_frame_occupancy(binary_string, frame_size, ttresolution = 78.125e-12, binsize = 260.41e-12):
+
+
     number_of_frames = int(binary_string[-1]/frame_size)+1
 
     frame_occupancy = zeros((number_of_frames),dtype=uint64)
@@ -181,10 +183,10 @@ def calculate_frame_locations(binary_string, frame_occupancies, frame_size):
         map_value = 0
         frame_number = int(element/frame_size)
         # print "Frame number is: ", frame_number 
-        position_in_frame = element%frame_size
+        position_in_frame = element % frame_size
         # print "Position in frame is: ", position_in_frame
         binary_position = frame_size - position_in_frame - 1
-        # print "Binary position: ", binary_position
+        #print "Binary position: ", binary_position
         map_value +=2**binary_position
         # print "Map value: ", map_value
         # to iterate through remaining elements in the frame
@@ -417,7 +419,10 @@ def resequence(locations,occupancies,frame_size):
 
 
 def calculateStatistics(alice,bob,alice_pol,bob_pol,resolution):
-    print "I entered"
+
+    # Alex: Calculating frame occupancies should take into account polarization information. We should assume all timing analysis occurs AFTER sifting.
+    # This means all events measured in the wrong basis should be discarded
+
     #saveprep("main_high",*prep())
 #     numpy.set_printoptions(edgeitems = 100) 
     

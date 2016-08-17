@@ -716,6 +716,7 @@ class SW_LDPC(object):
         self.setDecoder(decoder)
 
         # Create the propagating structure using the decoder
+        print shape(data_probability_matrix)
         self.prepare(data_probability_matrix)
 #         print "Data prob matrix\n",data_probability_matrix
         # Set the current sequence guess and failed parities
@@ -750,7 +751,7 @@ class SW_LDPC(object):
     def prepare(self, prior_probability_matrix):
         # Set up the necessary arrays
         number_of_bits = self.parityMatrix.shape[1]
-#         print "Number of bits",number_of_bits
+        print "Number of bits",number_of_bits
 #         print number_of_parity_check_eqns, "---<"
         # bits have length of big number (iterate with value 40000)         
         self.bits = [None] * number_of_bits
@@ -762,7 +763,7 @@ class SW_LDPC(object):
         
         # Create all of the objects
         for i in range(number_of_bits):
-#             print i,"->",prior_probability_matrix[:,i]
+            #print i,"->",prior_probability_matrix[:,i]
             self.bits[i] = self.bitClass(prior_probability_matrix[:, i])
         for i in xrange(number_of_parity_check_eqns):
             self.checks[i] = self.checkClass(self.syndromeValues[i])
@@ -793,7 +794,7 @@ class SW_LDPC(object):
     
     # Returns the number of errors the current sequence has compared to the known 'correct' sequence
     def distanceFromCorrect(self):
-        if (self.correctResult == None):
+        if (self.correctResult is None):
             print "Correct result is not provided so cannot estimate error of decoded string"
 #             return -1
         return float(self.errors(self.correctResult, self.sequenceGuess)) / len(self.correctResult), self.errors(self.correctResult, self.sequenceGuess)

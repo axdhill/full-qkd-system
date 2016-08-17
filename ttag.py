@@ -616,7 +616,7 @@ class TTBuffer(object):
     
     def coincidences(self,time,radius,delays=None):
         coincidenceMatrix = numpy.zeros((self.channels,self.channels),dtype=numpy.uint64)
-        if (delays!=None):
+        if (delays is not None):
             if not (isinstance(delays,numpy.ndarray)):
                 delays = numpy.array(delays,dtype=numpy.double)
             if (delays.dtype!=numpy.double or len(delays)>self.channels):
