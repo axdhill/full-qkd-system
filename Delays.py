@@ -90,7 +90,9 @@ def calculate_delays(aliceTtags,aliceChannels,bobTtags,bobChannels,
         #print i,j
         k+=1
 
-    delays = array([0, delays[0,6]+delays[1,6], delays[0,6]-delays[2,6], delays[0,7]-delays[3,7], delays[0,4],   delays[0,6]+delays[1,6]+delays[1,5],  delays[0,6],  delays[0,7]])
+    delays = array([0, delays[0,6]-delays[1,6], delays[0,6]-delays[2,6], delays[0,7]-delays[3,7], delays[0,4],   delays[0,6]-delays[1,6]+delays[1,5],  delays[0,6],  delays[0,7]])
+    print delays
+    delays[4] -= 211
     print delays
 
     # delays = getDelays(bufN,alice_channels,bob_channels,0.0,None,None,0.0000001,(A_B_timetags[-1]-10000)*bufN.resolution)

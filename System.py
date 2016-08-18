@@ -29,6 +29,10 @@ from ParityCheckMatrixGen import gallager_matrix
 from SlepianWolf import encode, check
 import timeit
 from SW_prep import randomMatrix
+
+import matplotlib.pyplot as plt
+
+
 '''
   This method returns subframing values used in Bob correction. It's basically, taking laser pulse,
   splitting it into coincidence window size chunks and taking the only mod value of actual timetag in that laser pulse.
@@ -283,13 +287,13 @@ def LDPC_decode_all_chunks(alice_thread, bob_thread, fraction_parity_checks, dec
 '''
   The same as above just used in binary error correction (for polarization bases bits)
 '''
-def LDPC_binary_encode(alice_thread, column_weight=3, row_weight=4):
-    total_string_length = len(alice_thread.bases_string)
+def LDPC_binary_encode(alice_thread, column_weight=32, row_weight=4):
+    total_string_length = len(alice_thread.pol_string)
     
     number_of_parity_check_eqns_gallager = int(total_string_length * 0.6)
  #   alice_thread.parity_binary_matrix = gallager_matrix(number_of_parity_check_eqns_gallager, total_string_length, column_weight, row_weight)
     alice_thread.parity_binary_matrix = randomMatrix(total_string_length, number_of_parity_check_eqns_gallager, column_weight)
-    alice_thread.binary_syndromes = encode(alice_thread.parity_binary_matrix, alice_thread.bases_string, alphabet=2)
+    alice_thread.binary_syndromes = encode(alice_thread.parity_binary_matrix, alice_thread.pol_string, alphabet=2)
     
 
 '''
@@ -318,13 +322,13 @@ def LDPC_decode(bob_thread, alice_thread, decoder='bp-fft', iterations=70, froze
 '''
 def LDPC_binary_decode(bob_thread, alice_thread, decoder='log-bp-fft', iterations=70, frozenFor=10):
     
-    bob_thread.sent_binary_string = bob_thread.bases_string[:len(bob_thread.received_binary_string)]
+    bob_thread.sent_binary_string = bob_thread.pol_string[:len(bob_thread.received_binary_string)]
     transition_matrix = transitionMatrix_data2_python(bob_thread.received_binary_string, bob_thread.sent_binary_string, alph=2)
     prior_probability_matrix_binary = sequenceProbMatrix(bob_thread.received_binary_string, transition_matrix)
     print prior_probability_matrix_binary.shape
 
     print "Creating binary belief propagation system\n"
-    belief_propagation_system = SW_LDPC(bob_thread.parity_binary_matrix, bob_thread.binary_syndromes, prior_probability_matrix_binary, original=alice_thread.bases_string, decoder=decoder)
+    belief_propagation_system = SW_LDPC(bob_thread.parity_binary_matrix, bob_thread.binary_syndromes, prior_probability_matrix_binary, original=alice_thread.pol_string, decoder=decoder)
     
     print "Binary belief propagation system is created\n"
     print "Will be doing decoding using binary belief prop system\n"
@@ -348,6 +352,11 @@ def prepare_bases(channels, channelArray):
     pol_value[in1d(channels,pol_bin_vals)] = 1
 
     return bases,pol_value
+
+
+def errorstats(diff_vals):
+    diffsize = float(len(diff_vals))
+    return (sum((diff_vals == 0).astype(int))/diffsize,sum((abs(diff_vals) == 1).astype(int))/diffsize,sum((abs(diff_vals) == 2).astype(int))/diffsize)
 
 '''
   Main thread class for Alice and Bob which are instances of it.
@@ -396,16 +405,18 @@ class PartyThread(threading.Thread):
 
 #             print self.name.upper()+" : Reading.csv files and converting to .npy\n"
 #             system("python ./DataProcessing.py "+self.raw_file_name+" "+self.name)
-
             print self.name.upper() + ": Loading .npy data\n"
             (self.ttags, self.channels) = load_data(self.name, self.channelArray, data_factor)
             print "#of ttags", len(self.ttags), "where last is ", self.ttags[-1]
             print "TOTAL TIME: ", self.ttags[-1] * resolution, " in seconds"
-            
+
+
+            self.totaltime = (self.ttags[-1] - self.ttags[0]) * self.resolution
+
             print self.name.upper() + ": Loading delays\n"
             self.delays = load("./Delays/delays.npy")
             self.delays = self.delays + abs(min(self.delays))
-            self.delays =  self.delays.astype(uint64)
+            self.delays =  self.delays.round()
 
             print self.name.upper() + ": Applying Delays"
 
@@ -438,7 +449,7 @@ class PartyThread(threading.Thread):
 
 # ===================================================================   
 
-            self.ttags = (self.ttags * resolution / binsize + 0.5).astype(int64)  # IMPORTANT : THIS CONVERTS FROM TIME TAGS TO LASER PULSES (I HOPE)
+            self.ttags = ((self.ttags * resolution / binsize ).round()).astype(uint64)  # IMPORTANT : THIS CONVERTS FROM TIME TAGS TO LASER PULSES (I HOPE)
 
             print self.name.upper() + ": Calculating frame occupancies and locations...\n"
             self.frame_occupancies = calculate_frame_occupancy(self.ttags, self.frame_size)
@@ -480,10 +491,10 @@ if __name__ == '__main__':
     announce_binary_fraction = 1.0
 #     D_block_size = int(coincidence_window_radius / resolution) * 2 + 1
     data_factor = 1000
-    optimal_frame_size =32
+    optimal_frame_size = 8192
     column_weight = 5
     row_weight = 32
-    fraction_parity_checks = 0.6
+    fraction_parity_checks = 0.2
     
 #     padding_zeros = 0
 #     while D_block_size != 0:
@@ -556,7 +567,7 @@ if __name__ == '__main__':
 
 
 
-    # delays_check = load('./Delays/delays.npy')
+    # delays_check = array([1,1,1,1,1,1,1,1])#load('./Delays/delays.npy')
     # A_B_timetags = concatenate([alice_thread.ttags, bob_thread.ttags])
     # A_B_channels = concatenate([alice_thread.channels, bob_thread.channels])
     # channels1 = [0, 1, 2, 3]
@@ -666,6 +677,20 @@ if __name__ == '__main__':
 #   Takes only frames with occupancy of one
     print "MUTUAL FRAMES WITH OCC 1\n", alice_thread.frame_locations[mutual_frames_with_occupancy_one]
     print bob_thread.frame_locations[mutual_frames_with_occupancy_one]
+    a = (alice_thread.frame_locations[mutual_frames_with_occupancy_one]).astype(int)
+    b = (bob_thread.frame_locations[mutual_frames_with_occupancy_one]).astype(int)
+    diffs =  a-b
+    # print diffs
+    # plt.hist(diffs,align='left',bins=range(-optimal_frame_size/2,optimal_frame_size/2))
+    # plt.title("String Diffs")
+    # plt.xlabel("Value")
+    # plt.ylabel("Frequency")
+    #
+    # fig = plt.gcf()
+    #
+    # plt.show()
+    print errorstats(diffs)
+
     print "MAIN: FRACTION OF FRAMES WITH MULTIPLE OCCUPANCY: ", sum(mutual_frames_with_multiple_occ) / float(len(alice_thread.frame_occupancies))
     alice_non_zero_positions_in_frame = alice_thread.frame_locations[mutual_frames_with_occupancy_one]
     alice_non_zero_positions_in_frame_channels = alice_thread.frame_location_channels[mutual_frames_with_occupancy_one]
@@ -701,9 +726,9 @@ if __name__ == '__main__':
 
     alice_thread.non_zero_positions = alice_non_zero_positions_in_frame[mutual_bases]
     alice_thread.non_zero_positions_channels = alice_non_zero_positions_in_frame_channels[mutual_bases]
-
     bob_thread.non_zero_positions = bob_non_zero_positions_in_frame[mutual_bases]
     bob_thread.non_zero_positions_channels = bob_non_zero_positions_in_frame_channels[mutual_bases]
+
 
     alice_thread.pol_string = alice_thread.pol_string[mutual_bases]
     bob_thread.pol_string = bob_thread.pol_string[mutual_bases]
@@ -719,7 +744,7 @@ if __name__ == '__main__':
 
 
     #   Estimates QBER where it is determined from non-mathcing pols  TODO: should be determined only from announced fraction
-    QBER = 1 - len(correct_pols)/float(len(bob_thread.pol_string))
+    QBER = 1 - sum((alice_thread.pol_string == bob_thread.pol_string).astype(int))/float(len(bob_thread.pol_string))
     print "ERROR IN POLARIZATION (QBER)", QBER
 
 
@@ -731,6 +756,8 @@ if __name__ == '__main__':
     bob_thread.non_zero_positions -= 1
     alice_thread.non_zero_positions -= 1
     bob_thread.non_zero_positions_channels -= 4
+
+
     print "MAIN: MUTUAL FRAME LOCATIONS: ", sum((bob_thread.non_zero_positions == alice_thread.non_zero_positions).astype(int)), " out of ", len(alice_thread.non_zero_positions), " % ", float(sum(bob_thread.non_zero_positions == alice_thread.non_zero_positions)) / len(alice_thread.non_zero_positions)
     print "MAIN: MUTUAL FRAME LOCATION CHANNELS", sum((bob_thread.non_zero_positions_channels == alice_thread.non_zero_positions_channels).astype(int)) + 4, "out of ", len(alice_thread.non_zero_positions_channels)
     print "LENGTH of Alice non-secret timing key", len(alice_thread.non_zero_positions)
@@ -766,13 +793,17 @@ if __name__ == '__main__':
 
     print "MAIN: Will be trying to decode and correct the string\n"
     print "MAIN: BINARY DECODING\n"
-    #bob_thread.bases_string = LDPC_binary_decode(bob_thread, alice_thread)
+    bob_thread.pol_string = LDPC_binary_decode(bob_thread, alice_thread)
+
+    sys.exit()
+
     print "MAIN: NON-BINARY DECODING\n"
 
-    bob_thread.non_zero_positions = LDPC_decode_all_chunks(alice_thread, bob_thread, fraction_parity_checks=0.6, chunk_size=40000, iterations=10, column_weight=5)
-
+    bob_thread.non_zero_positions = LDPC_decode_all_chunks(alice_thread, bob_thread, fraction_parity_checks, chunk_size=len(alice_thread.non_zero_positions), iterations=10, column_weight=5)
+    # print alice_thread.non_zero_positions
+    # sys.exit()
     print "MAIN: Key length", len(alice_thread.non_zero_positions), "and number of bits", (optimal_frame_size - 1).bit_length()
-    print "MAIN: NON-SECRET-KEY-RATE: MBit/s", ((((optimal_frame_size - 1).bit_length() * len(alice_thread.non_zero_positions)) + (len(alice_thread.bases_string))) / (alice_thread.ttags[-1] * 260.41e-12)) / 1e6
+    print "MAIN: NON-SECRET-KEY-RATE: MBit/s"
     print "Alice errors at",alice_thread.non_zero_positions[where(alice_thread.non_zero_positions != bob_thread.non_zero_positions)]
     print "Bob errors at",bob_thread.non_zero_positions[where(alice_thread.non_zero_positions != bob_thread.non_zero_positions)]
 
@@ -788,7 +819,6 @@ if __name__ == '__main__':
     print "MAIN: Secret key matches with fraction of:", (sum(alice_key == bob_key)) / float(len(alice_key))
 
 
-    sys.exit()
     #int(QBER * len(alice_thread.bases_string)) + int(len(alice_thread.non_zero_positions) * fraction_parity_checks)
     eves_bits = int(len(alice_thread.non_zero_positions)*fraction_parity_checks)
     print "MAIN: NON SECRET BITS", len(alice_key), "EVE KNOWS", eves_bits, "BITS"
@@ -805,8 +835,9 @@ if __name__ == '__main__':
 
     print "MAIN: Secret key matches after PA: ", sum(alice_key == bob_key) / float(len(alice_key))
     print "MAIN: SECRET BITS:", len(alice_key)
-    print "MAIN: SECRET-KEY-RATE: MBit/s", ((((optimal_frame_size - 1).bit_length() * (len(alice_thread.non_zero_positions) - int(len(alice_thread.non_zero_positions) * fraction_parity_checks))) + int(len(alice_thread.bases_string) * (1 - QBER))) / (alice_thread.ttags[-1] * 260.41e-12)) / 1e6
- 
+    print "MAIN: SECRET-KEY-RATE: MBit/s", len(alice_key)*log2(optimal_frame_size)/(alice_thread.totaltime)
+
+
     savetxt("./Secret_keys/alice_secret_key1.txt", alice_key, fmt="%2d")
     savetxt("./Secret_keys/bob_secret_key1.txt", bob_key, fmt="%2d")
     
