@@ -149,6 +149,8 @@ def load_data(name, channelArray, data_factor):
     sys.stdout.flush()
 #     all_ttags = load("./DarpaQKD/"+name+"Ttags.npy")
     all_ttags = load("./DarpaQKD/"+name+"Ttags.npy")
+
+    #all_ttags = load("./DarpaQKD/"+name+"FakeTtags.npy")
 #    all_ttags = load("./DarpaQKD/" + name + "TtagsREBINNEDfull.npy")
 #     all_ttags = load("./DarpaQKD/"+name+"TtagsBrightAttempt1.npy")
 #     all_ttags = load("./DarpaQKD/"+name+"TtagsBrightAttempt2.npy")
@@ -157,6 +159,8 @@ def load_data(name, channelArray, data_factor):
 #     all_channels = load("./DarpaQKD/"+name+"Channels.npy")
 
     all_channels = load("./DarpaQKD/"+name+"Channels.npy")
+
+    #all_channels = load("./DarpaQKD/"+name+"FakeChannels.npy")
 #    all_channels = load("./DarpaQKD/" + name + "ChannelsREBINNEDfull.npy")
 
 #     all_channels = load("./DarpaQKD/"+name+"ChannelsBrightAttempt1.npy")
@@ -490,7 +494,7 @@ if __name__ == '__main__':
     announce_fraction = 1.0
     announce_binary_fraction = 1.0
 #     D_block_size = int(coincidence_window_radius / resolution) * 2 + 1
-    data_factor = 1000
+    data_factor = 10
     optimal_frame_size = 8192
     column_weight = 5
     row_weight = 32
@@ -566,7 +570,7 @@ if __name__ == '__main__':
 
 
 
-
+    #
     # delays_check = array([1,1,1,1,1,1,1,1])#load('./Delays/delays.npy')
     # A_B_timetags = concatenate([alice_thread.ttags, bob_thread.ttags])
     # A_B_channels = concatenate([alice_thread.channels, bob_thread.channels])
@@ -777,7 +781,7 @@ if __name__ == '__main__':
     
     print "MAIN: LDPC: Encoding both NON-BINARY AND BINARY "
     
-    LDPC_binary_encode(alice_thread)
+  #  LDPC_binary_encode(alice_thread)
 
 #=============Sending syndrome values and parity check matrix=====
 
@@ -786,16 +790,15 @@ if __name__ == '__main__':
 #     bob_thread.syndromes = alice_thread.syndromes
 #     bob_thread.parity_matrix = alice_thread.parity_matrix
 #     
-    bob_thread.binary_syndromes = alice_thread.binary_syndromes
-    bob_thread.parity_binary_matrix = alice_thread.parity_binary_matrix
+ #   bob_thread.binary_syndromes = alice_thread.binary_syndromes
+ #   bob_thread.parity_binary_matrix = alice_thread.parity_binary_matrix
     
 #==================================================================
 
     print "MAIN: Will be trying to decode and correct the string\n"
     print "MAIN: BINARY DECODING\n"
-    bob_thread.pol_string = LDPC_binary_decode(bob_thread, alice_thread)
+    #bob_thread.pol_string = LDPC_binary_decode(bob_thread, alice_thread)
 
-    sys.exit()
 
     print "MAIN: NON-BINARY DECODING\n"
 
@@ -835,7 +838,8 @@ if __name__ == '__main__':
 
     print "MAIN: Secret key matches after PA: ", sum(alice_key == bob_key) / float(len(alice_key))
     print "MAIN: SECRET BITS:", len(alice_key)
-    print "MAIN: SECRET-KEY-RATE: MBit/s", len(alice_key)*log2(optimal_frame_size)/(alice_thread.totaltime)
+    print "MAIN: Total Time: ", alice_thread.totaltime
+    print "MAIN: SECRET-KEY-RATE: MBit/s", len(alice_key)*log2(optimal_frame_size)/(alice_thread.totaltime)/1e6
 
 
     savetxt("./Secret_keys/alice_secret_key1.txt", alice_key, fmt="%2d")
